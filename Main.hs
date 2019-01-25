@@ -1,16 +1,15 @@
 data Valtype = Symval | Intval | Exprval
 
-data Value = {
-  valtype :: Valtype
-  , valsym :: String
-  , valint :: Int
-  , valexpr :: Expr
-  } deriving (Show)
+data Value = ValSym String
+           | ValInt Int
+           | ValExpr Expr
+  deriving Show
 
-data Expr = {
-  car :: Value
+data Expr = MkExpr
+  {
+    car :: Value
   , cdr :: Maybe Expr
-  } deriving (Show)
+  } deriving Show
 
-main = do
-  
+main = do putStrLn "Benis"
+          putStrLn "B e n i s"
