@@ -19,22 +19,51 @@ data Expr = MkExpr
 (deft music (makeStruct '(id Int) '(artist String) '(album String)))
 (music-artist (music 1 "David Bowie" "Diamond Dogs"))
 -}
+parse_int :: String -> Int -> Either String Int
 parse_int sym r =
   if length sym == 0 then
     Right r
   else
-    if not isDigit (head sym) then
+    if not (isDigit (head sym)) then
       Left "not a digit, so not an int"
     else
-      parse_int (tail sym) (r*10)+((ord (head sym))-48)
+      parse_int (tail sym) ((r*10)+((ord (head sym))-48))
 
 read_expr e =
   case (car e) of
     Just v -> case v of
       ValSym sym -> case head sym of
-        hs | isDigit hs -> case parse_int sym of
-               Right ->
-    Nothing -> Right e { car=EmptyExpr }
+        c | isInfixOf " " sym -> case (cdr e) of
+                                   Just cdrv -> (let h = read_expr cdrv in
+                                                   case h of
+                                                     Right x -> Right (MkExpr { car=Just(ValString sym), cdr=Just x })
+                                                     Left err -> Left err)
+                                   Nothing -> Right e { car = Just(ValString sym) }
+        hs | isDigit hs -> case (parse_int sym 0) of
+                             Right iv -> case (cdr e) of
+                                           Just cdrv -> (let h = read_expr cdrv in
+                                                           case h of
+                                                             Right x -> Right (MkExpr { car=Just(ValInt iv), cdr=Just x })
+                                                             Left err -> Left err)
+                                           Nothing -> Right e { car = Just (ValInt iv) }
+                             Left err -> Left err
+        _ -> case (cdr e) of
+                  Just cdrv -> (let h = read_expr cdrv in
+                                  case h of
+                                    Right x -> Right (e { cdr=Just x })
+                                    Left err -> Left err)
+                  Nothing -> Right e
+      ValExpr expr -> let expr_read = read_expr expr in
+                        case expr_read of
+                          Right x -> case (cdr e) of
+                                       Just cdrv -> (let h = read_expr cdrv in
+                                                        case h of
+                                                          Right cdrx -> Right (MkExpr { car=Just(ValExpr x), cdr=Just cdrx })
+                                                          Left err -> Left err)
+                                       Nothing -> Right e { car=Just(ValExpr x) }
+                          Left err -> Left err
+      _ -> Right e
+    Nothing -> Right e { car=Just EmptyExpr }
 
 parse :: String -> Expr -> Int -> Bool -> Either String (Expr, String)
 parse str e in_expr in_str =
@@ -85,9 +114,11 @@ parse str e in_expr in_str =
 strExpr :: Expr -> String
 strExpr e =
   intercalate "" [case car e of
-                    Just (ValSym  s) -> s
-                    Just (ValInt  i) -> show i
+                    Just (ValSym  s) -> "[sym "++s++"]"
+                    Just (ValInt  i) -> "[int "++show i++"]"
                     Just (ValExpr g) -> "(" ++ strExpr g ++ ")"
+                    Just (ValString s) -> "\""++s++"\""
+                    Just EmptyExpr -> "()"
                     Nothing          -> "??",
                   --" ",
            (case cdr e of
@@ -95,8 +126,11 @@ strExpr e =
                Just cdrexpr -> " "++(strExpr cdrexpr))]
 
 main = do
-  case (parse "(strlen \"a (xy) b\")" (MkExpr { car = Nothing, cdr = Nothing }) 0 False) of
+  case (parse "((lambda (x) (+ x 2)) 3)" (MkExpr { car = Nothing, cdr = Nothing }) 0 False) of
     Right expr -> do
       putStrLn (strExpr $ fst expr)
+      case read_expr (fst expr) of
+        Left err -> putStrLn err
+        Right ce -> putStrLn (strExpr $ ce)
       putStrLn $ "remaining " ++ if length (snd expr) > 0 then snd expr else "none"
     Left err -> putStrLn err
