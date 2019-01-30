@@ -19,6 +19,12 @@ data Expr = MkExpr
 (deft music (makeStruct '(id Int) '(artist String) '(album String)))
 (music-artist (music 1 "David Bowie" "Diamond Dogs"))
 -}
+
+{-eval_expr e =
+  case (car e) of
+    Just v -> case v of
+      Val-}
+
 parse_int :: String -> Int -> Either String Int
 parse_int sym r =
   if length sym == 0 then
@@ -47,6 +53,7 @@ read_expr e =
                                                              Left err -> Left err)
                                            Nothing -> Right e { car = Just (ValInt iv) }
                              Left err -> Left err
+       
         _ -> case (cdr e) of
                   Just cdrv -> (let h = read_expr cdrv in
                                   case h of
@@ -69,6 +76,12 @@ parse :: String -> Expr -> Int -> Bool -> Either String (Expr, String)
 parse str e in_expr in_str =
   if length str > 0 then
     case head str of
+      '\'' | not in_str -> let quoted = parse (tail str) (MkExpr { car = Nothing, cdr = Nothing }) (in_expr) False in
+                             case quoted of
+                               Right q -> Right ((MkExpr { car = Just $ ValExpr (MkExpr { car = Just $ ValSym $ "quote",
+                                                                                          cdr = Just $ (MkExpr {car=(car (fst q)),cdr=Nothing})}),
+                                                           cdr = (cdr (fst q))}), snd q)
+                               Left err -> Left err
       '(' | not in_str -> let next = parse (tail str) (MkExpr { car = Nothing, cdr = Nothing }) (in_expr + 1) False
                           in
                             case next of
@@ -126,7 +139,7 @@ strExpr e =
                Just cdrexpr -> " "++(strExpr cdrexpr))]
 
 main = do
-  case (parse "((lambda (x) (+ x 2)) 3)" (MkExpr { car = Nothing, cdr = Nothing }) 0 False) of
+  case (parse "'h 2" (MkExpr { car = Nothing, cdr = Nothing }) 0 False) of
     Right expr -> do
       putStrLn (strExpr $ fst expr)
       case read_expr (fst expr) of
