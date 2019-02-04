@@ -1,9 +1,12 @@
 import Data.Char
 import Data.List
+import Data.Map (Map, fromList, toList)            -- This just imports the type name
 data Value = ValSym String
            | ValInt Int
            | ValExpr Expr
            | ValString String
+           | ValBuiltinFn String
+           | ValFn [Expr] Expr -- Function: [(argname . argtype)] argmethod
            | EmptyExpr
   deriving Show
 
@@ -24,6 +27,51 @@ data Expr = MkExpr
   case (car e) of
     Just v -> case v of
       Val-}
+
+size_expr :: Maybe Expr -> Int -> Int
+size_expr e i =
+  case e of
+    Nothing -> i
+    Just u -> case (cdr u) of
+                Just h -> size_expr (Just h) (i+1)
+                Nothing -> i
+
+--check_func expected_size expected_args =
+  
+
+eval_expr :: Expr -> Map String Value -> Either String Value
+eval_expr e b =
+  case (car e) of
+    Just (ValExpr expr) ->
+      let fn = (car expr)
+          args = (cdr expr) in
+        case fn of
+          Nothing -> Left "function call with empty function specifier"
+          Just fnv -> let evald_fnv = (eval_expr MkExpr { car=Just fnv, cdr=Nothing } b) in
+            case evald_fnv of
+              Left err -> Left err
+              Right fn_val -> case fn_val of
+                                 ValBuiltinFn builtin -> case builtin of
+                                                            "quote" -> (case size_expr args 0 of
+                                                                          0 -> Left ("quote is unary, nullary given" ++ (case args of
+                                                                                                                           Just q -> (strExpr q)
+                                                                                                                           Nothing -> ""))
+                                                                          1 -> (case args of
+                                                                                  Just av -> (case (car av) of
+                                                                                                Just h -> Right h
+                                                                                                Nothing -> Left "??")
+                                                                                  Nothing -> Left "??")
+                                                                          n -> Left ("quote is unary, "++show(n)++"-ary given"))
+                                                              _ -> Left "unrecognised builtin"
+                                 _ -> Left "unrecognised type of function"
+    Just (ValSym s) -> case s of
+      "quote" -> Right (ValBuiltinFn "quote")
+      _ -> case lookup s (toList b) of
+             Nothing -> Left ("unbound identifier: " ++ s)
+             Just found_bind -> Right found_bind
+    Just care -> Right care
+    Nothing -> Left "expected a car"
+      
 
 parse_int :: String -> Int -> Either String Int
 parse_int sym r =
@@ -124,15 +172,19 @@ parse str e in_expr in_str =
     else
       Right (e, tail str)
 
+strVal :: Maybe Value -> String
+strVal v =
+  case v of
+    Just (ValSym  s) -> "[sym "++s++"]"
+    Just (ValInt  i) -> "[int "++show i++"]"
+    Just (ValExpr g) -> "(" ++ strExpr g ++ ")"
+    Just (ValString s) -> "\""++s++"\""
+    Just EmptyExpr -> "()"
+    Nothing          -> "??"
+
 strExpr :: Expr -> String
 strExpr e =
-  intercalate "" [case car e of
-                    Just (ValSym  s) -> "[sym "++s++"]"
-                    Just (ValInt  i) -> "[int "++show i++"]"
-                    Just (ValExpr g) -> "(" ++ strExpr g ++ ")"
-                    Just (ValString s) -> "\""++s++"\""
-                    Just EmptyExpr -> "()"
-                    Nothing          -> "??",
+  intercalate "" [strVal (car e),
                   --" ",
            (case cdr e of
                Nothing -> ""--"nil"
@@ -144,6 +196,8 @@ main = do
       putStrLn (strExpr $ fst expr)
       case read_expr (fst expr) of
         Left err -> putStrLn err
-        Right ce -> putStrLn (strExpr $ ce)
+        Right ce -> putStrLn ("evaluated: " ++ case (eval_expr ce (fromList [])) of
+                                                Left err -> err
+                                                Right v -> strVal (Just v))
       putStrLn $ "remaining " ++ if length (snd expr) > 0 then snd expr else "none"
     Left err -> putStrLn err
