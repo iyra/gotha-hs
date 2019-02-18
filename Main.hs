@@ -1,15 +1,17 @@
 import Data.Char
 import Data.List
 import Data.Map (Map, fromList, toList)            -- This just imports the type name
+data Ty = str | int | expr
 data Value = ValSym String
            | ValInt Int
            | ValExpr Expr
            | ValString String
            | ValBuiltinFn String
-           | ValFn [Expr] Expr -- Function: [(argname . argtype)] argmethod
+           | ValFn [Expr] Value -- Function: [(argname . argtype)] argmethod
+           | ValCons Value Value
            | EmptyExpr
   deriving Show
-
+data 
 data Expr = MkExpr
   {
     car :: Maybe Value
@@ -19,7 +21,12 @@ data Expr = MkExpr
 -- fst = expr
 -- snd = string
 {-
-(deft music (makeStruct '(id Int) '(artist String) '(album String)))
+(define myType (list int int int))
+(define myBool (? 'true 'false))
+(define myMaybeInt (? int 'Nothing))
+(define myBoolVal 'true)
+(define questionAnswer (lambda ((x (? myBool 'Nothing))) (cond x (('Nothing "oops") ('true "yay") ('false "nay")))))
+(Deft music (makeStruct '(id Int) '(artist String) '(album String)))
 (music-artist (music 1 "David Bowie" "Diamond Dogs"))
 -}
 
@@ -34,7 +41,7 @@ size_expr e i =
     Nothing -> i
     Just u -> case (cdr u) of
                 Just h -> size_expr (Just h) (i+1)
-                Nothing -> i
+                Nothing -> i+1
 
 --check_func expected_size expected_args =
   
@@ -62,7 +69,7 @@ eval_expr e b =
                                                                                                 Nothing -> Left "??")
                                                                                   Nothing -> Left "??")
                                                                           n -> Left ("quote is unary, "++show(n)++"-ary given"))
-                                                              _ -> Left "unrecognised builtin"
+                                                            _ -> Left "unrecognised builtin"
                                  _ -> Left "unrecognised type of function"
     Just (ValSym s) -> case s of
       "quote" -> Right (ValBuiltinFn "quote")
@@ -71,7 +78,23 @@ eval_expr e b =
              Just found_bind -> Right found_bind
     Just care -> Right care
     Nothing -> Left "expected a car"
-      
+
+is_cons :: Expr -> Maybe ValCons
+is_cons e =
+  case (car e) of
+    Nothing -> False
+    Just _ -> case (cdr e) of
+      Nothing -> False
+      Just d -> case (car d) of
+        Nothing -> False
+        Just (ValSym s) -> if s == "." then
+                             case (cdr d) of
+                               Nothing -> False
+                               Just q -> case (cdr q) of
+                                 Nothing -> True
+                                 _ -> False
+                           else
+                             False
 
 parse_int :: String -> Int -> Either String Int
 parse_int sym r =
@@ -191,7 +214,7 @@ strExpr e =
                Just cdrexpr -> " "++(strExpr cdrexpr))]
 
 main = do
-  case (parse "'h 2" (MkExpr { car = Nothing, cdr = Nothing }) 0 False) of
+  case (parse "((a b) . 2)" (MkExpr { car = Nothing, cdr = Nothing }) 0 False) of
     Right expr -> do
       putStrLn (strExpr $ fst expr)
       case read_expr (fst expr) of
